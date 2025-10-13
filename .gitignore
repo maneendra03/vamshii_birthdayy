@@ -21,3 +21,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Ignore large media files
+vamshieee/
+.env.local
+.env.production.local
