@@ -74,45 +74,87 @@ function convertLfsPointer(filepath) {
   }
 }
 
-// Function to force download specific LFS files
-function forceDownloadSpecificLfsFiles(lfsFiles) {
+// Function to force download all LFS files with maximum verbosity
+function forceDownloadAllLfsFiles() {
   try {
-    console.log('Force downloading specific LFS files...');
+    console.log('Force downloading ALL LFS files with maximum verbosity...');
     
     // Set environment variables to ensure LFS files are downloaded
     const env = { ...process.env };
     env.GIT_LFS_SKIP_SMUDGE = '0';
-    env.GIT_TRACE = '1';
+    env.GIT_TRACE = '2'; // Maximum verbosity
+    env.GIT_CURL_VERBOSE = '2';
     
-    // Create a list of file paths for inclusion
-    const filePaths = lfsFiles.map(file => file.filepath).join(',');
-    
-    // Force download specific LFS files
-    execSync(`git lfs pull --include="${filePaths}"`, {
+    // Force download all LFS files
+    execSync('git lfs pull --exclude="" --include="*" --verbose', {
       env,
       stdio: 'inherit'
     });
     
-    console.log('Specific LFS files force downloaded successfully');
+    console.log('ALL LFS files force downloaded successfully');
     return true;
   } catch (error) {
-    console.log('Failed to force download specific LFS files:', error.message);
+    console.log('Failed to force download ALL LFS files:', error.message);
     return false;
   }
 }
 
-// Function to manually download LFS files if other methods fail
-async function manualLfsDownload(lfsFiles) {
-  console.log('Attempting manual LFS download approach...');
+// Function to verify and fix LFS files
+function verifyAndFixLfsFiles() {
+  console.log('Verifying and fixing LFS files...');
   
-  // This is a simplified approach - in a real implementation for Vercel,
-  // you would need to use the GitHub LFS API properly
-  console.log('Manual download approach for Vercel not implemented in this script.');
-  console.log('Consider these alternatives:');
-  console.log('1. Optimize files to avoid LFS requirements');
-  console.log('2. Move large files to external storage');
-  
-  return false;
+  try {
+    // Count total files
+    const fileCount = execSync('find public/vamshieee -type f | wc -l', { encoding: 'utf8' });
+    console.log('Total files in public/vamshieee:', fileCount.trim());
+    
+    // Check all files in the vamshieee directory
+    const checkCmd = 'find public/vamshieee -type f';
+    const files = execSync(checkCmd, { encoding: 'utf8' }).split('\n').filter(f => f.trim());
+    
+    let pointerCount = 0;
+    let pointerFiles = [];
+    
+    console.log(`Checking ${files.length} files for LFS pointers...`);
+    
+    files.forEach(file => {
+      if (file && isLfsPointer(file)) {
+        pointerCount++;
+        pointerFiles.push(file);
+        console.log('  LFS pointer found:', file);
+      }
+    });
+    
+    console.log(`Found ${pointerCount} LFS pointer files out of ${files.length} total files`);
+    
+    // If we found pointer files, try to convert them
+    if (pointerCount > 0) {
+      console.log('Attempting to convert pointer files to actual files...');
+      
+      let convertedCount = 0;
+      for (const file of pointerFiles) {
+        try {
+          const success = convertLfsPointer(file);
+          if (success) {
+            console.log(`  Successfully converted ${file}`);
+            convertedCount++;
+          } else {
+            console.log(`  Failed to convert ${file}`);
+          }
+        } catch (convertError) {
+          console.log(`  Error converting ${file}:`, convertError.message);
+        }
+      }
+      
+      console.log(`Converted ${convertedCount} of ${pointerCount} pointer files`);
+      return { pointerCount, convertedCount };
+    }
+    
+    return { pointerCount: 0, convertedCount: 0 };
+  } catch (error) {
+    console.log('Error during verification and fixing:', error.message);
+    return { pointerCount: -1, convertedCount: -1 };
+  }
 }
 
 console.log('Checking if Git LFS is installed...');
@@ -144,16 +186,16 @@ const lfsFiles = getLfsFileInfo();
 console.log('LFS files count:', lfsFiles.length);
 
 if (lfsFiles.length > 0) {
-  console.log('First few LFS files:');
-  lfsFiles.slice(0, 3).forEach(file => {
+  console.log('Sample LFS files:');
+  lfsFiles.slice(0, 5).forEach(file => {
     console.log('  ', file.oid, file.filepath);
   });
-  
-  // In Vercel environment, force download specific LFS files
-  if (isVercel) {
-    console.log('Forcing download of specific LFS files in Vercel environment...');
-    forceDownloadSpecificLfsFiles(lfsFiles);
-  }
+}
+
+// In Vercel environment, force download all LFS files
+if (isVercel && lfsFiles.length > 0) {
+  console.log('Forcing download of ALL LFS files in Vercel environment...');
+  forceDownloadAllLfsFiles();
 }
 
 // Try to pull LFS files normally first
@@ -198,85 +240,19 @@ if (!pullSuccess || isVercel) {
   }
 }
 
-// Verify that files exist after pulling and check if they are actual files or pointers
-console.log('Verifying file existence and content...');
-let pointerFiles = [];
+// Verify and fix LFS files
+console.log('Verifying and fixing LFS files...');
+const fixResult = verifyAndFixLfsFiles();
 
+// Final verification
+console.log('Final verification...');
 try {
-  const fileCount = execSync('find public/vamshieee -type f | wc -l', { encoding: 'utf8' });
-  console.log('Files in public/vamshieee:', fileCount.trim());
-  
-  // Check if files are LFS pointers
-  console.log('Checking for LFS pointer files...');
-  let pointerCount = 0;
-  
-  // Check all files in the vamshieee directory
-  const checkCmd = 'find public/vamshieee -type f';
-  const files = execSync(checkCmd, { encoding: 'utf8' }).split('\n').filter(f => f.trim());
-  
-  files.forEach(file => {
-    if (file && isLfsPointer(file)) {
-      pointerCount++;
-      pointerFiles.push(file);
-      console.log('  LFS pointer found:', file);
-    }
-  });
-  
-  console.log(`Found ${pointerCount} LFS pointer files`);
-  
-  // If we found pointer files in Vercel, try to convert them
-  if (pointerCount > 0 && isVercel) {
-    console.log('WARNING: LFS pointer files found in Vercel environment!');
-    console.log('This indicates that LFS files were not properly downloaded.');
-    console.log('Attempting to convert pointer files to actual files using git lfs smudge...');
-    
-    // Try to convert each pointer file
-    let convertedCount = 0;
-    for (const file of pointerFiles) {
-      try {
-        const success = convertLfsPointer(file);
-        if (success) {
-          console.log(`  Successfully converted ${file}`);
-          convertedCount++;
-        } else {
-          console.log(`  Failed to convert ${file}`);
-        }
-      } catch (convertError) {
-        console.log(`  Error converting ${file}:`, convertError.message);
-      }
-    }
-    
-    console.log(`Converted ${convertedCount} of ${pointerCount} pointer files`);
-    
-    // If we still have pointer files, try one more approach
-    if (convertedCount < pointerCount) {
-      console.log('Trying one more approach to download LFS files...');
-      try {
-        execSync('git lfs pull --exclude=""', { stdio: 'inherit' });
-        console.log('Additional LFS pull completed');
-      } catch (error) {
-        console.log('Additional LFS pull failed:', error.message);
-      }
-    }
-    
-    // Final check - if we still have pointer files, suggest alternatives
-    if (convertedCount < pointerCount) {
-      console.log('FINAL WARNING: Some LFS pointer files remain unconverted.');
-      console.log('This is a known limitation with Vercel and Git LFS.');
-      console.log('RECOMMENDED SOLUTIONS:');
-      console.log('1. Optimize media files to reduce size and avoid LFS requirements');
-      console.log('2. Move large files to external storage (S3, Cloudinary, etc.)');
-      console.log('3. Use Vercel\'s built-in file storage capabilities');
-    }
-  }
-  
-  if (pointerCount > 0 && isVercel) {
-    console.log('Vercel has known limitations with Git LFS.');
-    console.log('The most reliable solution is to avoid LFS by optimizing file sizes.');
-  }
+  const finalCheck = execSync('find public/vamshieee -type f | head -10 | xargs file', { encoding: 'utf8' });
+  console.log('File types in vamshieee directory:');
+  console.log(finalCheck);
 } catch (error) {
-  console.log('Could not verify files');
-  console.error(error);
+  console.log('Could not perform final verification:', error.message);
 }
 
 console.log('Prebuild script completed');
+console.log(`Summary: Found ${fixResult.pointerCount} pointer files, converted ${fixResult.convertedCount}`);
