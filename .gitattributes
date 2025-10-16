@@ -1,7 +1,10 @@
-*.jpg filter=lfs diff=lfs merge=lfs -text
-*.jpeg filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
+# Only use LFS for large video files over 50MB
 *.mp4 filter=lfs diff=lfs merge=lfs -text
-*.webp filter=lfs diff=lfs merge=lfs -text
 vamshieee/VID20230522160348.mp4 filter=lfs diff=lfs merge=lfs -text
 vamshieee/VIDEO-2025-10-13-16-42-28.mp4 filter=lfs diff=lfs merge=lfs -text
+
+# Remove LFS for images to avoid Vercel issues
+# *.jpg filter=lfs diff=lfs merge=lfs -text
+# *.jpeg filter=lfs diff=lfs merge=lfs -text
+# *.png filter=lfs diff=lfs merge=lfs -text
+# *.webp filter=lfs diff=lfs merge=lfs -text
