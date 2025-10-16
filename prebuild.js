@@ -1,9 +1,6 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { createWriteStream } from 'fs';
-import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
 
 console.log('Starting prebuild script...');
 
@@ -48,60 +45,41 @@ function getLfsFileInfo() {
   }
 }
 
-// Function to download LFS file directly from GitHub
-async function downloadLfsFile(oid, filepath) {
+// Function to extract OID from LFS pointer file
+function extractOidFromPointer(filepath) {
   try {
-    console.log(`Downloading LFS file: ${filepath} with OID: ${oid}`);
-    
-    // Create directory if it doesn't exist
-    const dir = path.dirname(filepath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-    // For GitHub repositories, we can download LFS files directly
-    // This is a simplified approach - in a real implementation, you would
-    // need to use the GitHub LFS API properly
-    console.log(`  Would download ${oid} to ${filepath}`);
-    return true;
+    const content = fs.readFileSync(filepath, 'utf8');
+    const oidMatch = content.match(/oid sha256:([a-f0-9]+)/);
+    return oidMatch ? oidMatch[1] : null;
   } catch (error) {
-    console.log(`Failed to download LFS file ${filepath}:`, error.message);
-    return false;
+    console.log(`Error reading pointer file ${filepath}:`, error.message);
+    return null;
   }
 }
 
-// Function to convert LFS pointer to actual file
-async function convertLfsPointer(filepath) {
+// Function to convert LFS pointer to actual file using git lfs smudge
+function convertLfsPointer(filepath) {
   try {
     console.log(`Converting LFS pointer: ${filepath}`);
     
-    // Read the pointer file to get the OID
+    // Read the pointer file content
     const pointerContent = fs.readFileSync(filepath, 'utf8');
-    const oidMatch = pointerContent.match(/oid sha256:([a-f0-9]+)/);
     
-    if (oidMatch && oidMatch[1]) {
-      const oid = oidMatch[1];
-      console.log(`  Found OID: ${oid}`);
-      
-      // Try to get the actual file using git lfs smudge
-      try {
-        const smudgeOutput = execSync(`git lfs smudge`, {
-          input: pointerContent,
-          cwd: path.dirname(filepath)
-        });
-        
-        // Write the actual file content
-        fs.writeFileSync(filepath, smudgeOutput);
-        console.log(`  Successfully converted pointer to actual file`);
-        return true;
-      } catch (smudgeError) {
-        console.log(`  Failed to smudge file:`, smudgeError.message);
-      }
+    // Use git lfs smudge to convert pointer to actual file
+    const smudgeProcess = require('child_process').spawnSync('git', ['lfs', 'smudge'], {
+      input: pointerContent,
+      encoding: 'buffer'
+    });
+    
+    if (smudgeProcess.status === 0) {
+      // Write the actual file content
+      fs.writeFileSync(filepath, smudgeProcess.stdout);
+      console.log(`  Successfully converted pointer to actual file`);
+      return true;
     } else {
-      console.log(`  Could not extract OID from pointer file`);
+      console.log(`  Failed to smudge file:`, smudgeProcess.stderr.toString());
+      return false;
     }
-    
-    return false;
   } catch (error) {
     console.log(`Failed to convert LFS pointer ${filepath}:`, error.message);
     return false;
@@ -215,14 +193,16 @@ try {
   if (pointerCount > 0 && isVercel) {
     console.log('WARNING: LFS pointer files found in Vercel environment!');
     console.log('This indicates that LFS files were not properly downloaded.');
-    console.log('Attempting to convert pointer files to actual files...');
+    console.log('Attempting to convert pointer files to actual files using git lfs smudge...');
     
     // Try to convert each pointer file
+    let convertedCount = 0;
     for (const file of pointerFiles) {
       try {
-        const success = await convertLfsPointer(file);
+        const success = convertLfsPointer(file);
         if (success) {
           console.log(`  Successfully converted ${file}`);
+          convertedCount++;
         } else {
           console.log(`  Failed to convert ${file}`);
         }
@@ -230,11 +210,16 @@ try {
         console.log(`  Error converting ${file}:`, convertError.message);
       }
     }
+    
+    console.log(`Converted ${convertedCount} of ${pointerCount} pointer files`);
   }
   
   if (pointerCount > 0 && isVercel) {
     console.log('Vercel may have limitations with Git LFS.');
-    console.log('Consider moving large files to external storage for production deployments.');
+    console.log('If conversion fails, consider these alternatives:');
+    console.log('1. Move large files to external storage (S3, Cloudinary, etc.)');
+    console.log('2. Reduce file sizes to avoid LFS requirements');
+    console.log('3. Use Vercel\'s file upload capabilities for large assets');
   }
 } catch (error) {
   console.log('Could not verify files');
