@@ -7,4 +7,15 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucice-react'],
   },
+  // Ensure public assets are properly served
+  publicDir: 'public',
+  build: {
+    // Ensure assets are properly copied
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
 });
