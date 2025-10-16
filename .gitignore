@@ -22,7 +22,6 @@ dist-ssr
 *.sw?
 .env
 
-# Ignore large media files
-vamshieee/
+# Ignore local environment files
 .env.local
 .env.production.local
