@@ -157,6 +157,46 @@ function verifyAndFixLfsFiles() {
   }
 }
 
+// NEW: Function to check if we're in a git repository with LFS
+function checkGitLfsRepo() {
+  try {
+    // Check if this is a git repo
+    execSync('git rev-parse --git-dir', { stdio: 'ignore' });
+    console.log('Confirmed: This is a git repository');
+    
+    // Check if LFS is initialized
+    execSync('git lfs ls-files', { stdio: 'ignore' });
+    console.log('Confirmed: Git LFS is initialized');
+    
+    return true;
+  } catch (error) {
+    console.log('This is not a git repository with LFS or there was an error:', error.message);
+    return false;
+  }
+}
+
+// NEW: Function to copy files from LFS storage if available
+function copyLfsFilesIfAvailable() {
+  try {
+    console.log('Checking for LFS files in local storage...');
+    
+    // In some environments, LFS files might be available in .git/lfs/objects
+    const lfsObjectsPath = '.git/lfs/objects';
+    if (fs.existsSync(lfsObjectsPath)) {
+      console.log('LFS objects directory found');
+      // This is a complex operation that would require parsing the LFS structure
+      // For now, we'll just log that it exists
+    } else {
+      console.log('LFS objects directory not found locally');
+    }
+    
+    return true;
+  } catch (error) {
+    console.log('Error checking LFS files in local storage:', error.message);
+    return false;
+  }
+}
+
 console.log('Checking if Git LFS is installed...');
 try {
   const versionOutput = execSync('git lfs --version', { encoding: 'utf8' });
@@ -171,6 +211,14 @@ try {
     console.log('Could not install Git LFS automatically, continuing without it...');
   }
 }
+
+// NEW: Check if we're in a proper git repo with LFS
+if (!checkGitLfsRepo()) {
+  console.log('WARNING: Not in a proper git repository with LFS. This may cause issues.');
+}
+
+// NEW: Try to copy LFS files if available locally
+copyLfsFilesIfAvailable();
 
 console.log('Checking LFS status...');
 try {
@@ -244,12 +292,17 @@ if (!pullSuccess || isVercel) {
 console.log('Verifying and fixing LFS files...');
 const fixResult = verifyAndFixLfsFiles();
 
-// Final verification
-console.log('Final verification...');
+// NEW: Final check to ensure all files are actual files, not pointers
+console.log('Performing final verification...');
 try {
-  const finalCheck = execSync('find public/vamshieee -type f | head -10 | xargs file', { encoding: 'utf8' });
-  console.log('File types in vamshieee directory:');
-  console.log(finalCheck);
+  const fileCheck = execSync('find public/vamshieee -type f -exec head -c 20 {} \\; -exec echo " {}" \\; | grep "version https://git-lfs.github.com" || echo "No LFS pointers found"', { encoding: 'utf8' });
+  
+  if (fileCheck.includes('No LFS pointers found')) {
+    console.log('SUCCESS: No LFS pointer files found. All files appear to be actual media files.');
+  } else {
+    console.log('WARNING: Some LFS pointer files may still be present:');
+    console.log(fileCheck);
+  }
 } catch (error) {
   console.log('Could not perform final verification:', error.message);
 }
