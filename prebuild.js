@@ -45,18 +45,6 @@ function getLfsFileInfo() {
   }
 }
 
-// Function to extract OID from LFS pointer file
-function extractOidFromPointer(filepath) {
-  try {
-    const content = fs.readFileSync(filepath, 'utf8');
-    const oidMatch = content.match(/oid sha256:([a-f0-9]+)/);
-    return oidMatch ? oidMatch[1] : null;
-  } catch (error) {
-    console.log(`Error reading pointer file ${filepath}:`, error.message);
-    return null;
-  }
-}
-
 // Function to convert LFS pointer to actual file using git lfs smudge
 function convertLfsPointer(filepath) {
   try {
@@ -82,6 +70,30 @@ function convertLfsPointer(filepath) {
     }
   } catch (error) {
     console.log(`Failed to convert LFS pointer ${filepath}:`, error.message);
+    return false;
+  }
+}
+
+// Function to force download LFS files
+function forceDownloadLfsFiles() {
+  try {
+    console.log('Force downloading LFS files...');
+    
+    // Set environment variables to ensure LFS files are downloaded
+    const env = { ...process.env };
+    env.GIT_LFS_SKIP_SMUDGE = '0';
+    env.GIT_TRACE = '1';
+    
+    // Force download all LFS files
+    execSync('git lfs pull --exclude="" --include="*"', {
+      env,
+      stdio: 'inherit'
+    });
+    
+    console.log('LFS files force downloaded successfully');
+    return true;
+  } catch (error) {
+    console.log('Failed to force download LFS files:', error.message);
     return false;
   }
 }
@@ -119,6 +131,12 @@ if (lfsFiles.length > 0) {
   lfsFiles.slice(0, 3).forEach(file => {
     console.log('  ', file.oid, file.filepath);
   });
+  
+  // In Vercel environment, force download LFS files
+  if (isVercel) {
+    console.log('Forcing LFS file download in Vercel environment...');
+    forceDownloadLfsFiles();
+  }
 }
 
 // Try to pull LFS files normally first
@@ -212,6 +230,17 @@ try {
     }
     
     console.log(`Converted ${convertedCount} of ${pointerCount} pointer files`);
+    
+    // If we still have pointer files, try one more approach
+    if (convertedCount < pointerCount) {
+      console.log('Trying one more approach to download LFS files...');
+      try {
+        execSync('git lfs pull --exclude=""', { stdio: 'inherit' });
+        console.log('Additional LFS pull completed');
+      } catch (error) {
+        console.log('Additional LFS pull failed:', error.message);
+      }
+    }
   }
   
   if (pointerCount > 0 && isVercel) {
