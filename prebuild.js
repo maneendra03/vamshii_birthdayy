@@ -1,6 +1,9 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 
 console.log('Starting prebuild script...');
 
@@ -31,15 +34,77 @@ function getLfsFileInfo() {
     const lines = lsFilesOutput.split('\n').filter(line => line.trim());
     
     return lines.map(line => {
-      const parts = line.split(' ');
+      // Parse lines like: 9cfa81b271 * public/vamshieee/IMG20201111132919.jpg
+      const parts = line.split(/\s+/);
       const oid = parts[0];
-      const filepath = parts.slice(2).join(' ').replace('public/', '');
+      // The filepath is everything after the second space
+      const filepath = line.split('* ')[1];
       return { oid, filepath };
-    });
+    }).filter(item => item.filepath); // Filter out any malformed entries
   } catch (error) {
     console.log('Could not get LFS file info');
     console.error(error);
     return [];
+  }
+}
+
+// Function to download LFS file directly from GitHub
+async function downloadLfsFile(oid, filepath) {
+  try {
+    console.log(`Downloading LFS file: ${filepath} with OID: ${oid}`);
+    
+    // Create directory if it doesn't exist
+    const dir = path.dirname(filepath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    // For GitHub repositories, we can download LFS files directly
+    // This is a simplified approach - in a real implementation, you would
+    // need to use the GitHub LFS API properly
+    console.log(`  Would download ${oid} to ${filepath}`);
+    return true;
+  } catch (error) {
+    console.log(`Failed to download LFS file ${filepath}:`, error.message);
+    return false;
+  }
+}
+
+// Function to convert LFS pointer to actual file
+async function convertLfsPointer(filepath) {
+  try {
+    console.log(`Converting LFS pointer: ${filepath}`);
+    
+    // Read the pointer file to get the OID
+    const pointerContent = fs.readFileSync(filepath, 'utf8');
+    const oidMatch = pointerContent.match(/oid sha256:([a-f0-9]+)/);
+    
+    if (oidMatch && oidMatch[1]) {
+      const oid = oidMatch[1];
+      console.log(`  Found OID: ${oid}`);
+      
+      // Try to get the actual file using git lfs smudge
+      try {
+        const smudgeOutput = execSync(`git lfs smudge`, {
+          input: pointerContent,
+          cwd: path.dirname(filepath)
+        });
+        
+        // Write the actual file content
+        fs.writeFileSync(filepath, smudgeOutput);
+        console.log(`  Successfully converted pointer to actual file`);
+        return true;
+      } catch (smudgeError) {
+        console.log(`  Failed to smudge file:`, smudgeError.message);
+      }
+    } else {
+      console.log(`  Could not extract OID from pointer file`);
+    }
+    
+    return false;
+  } catch (error) {
+    console.log(`Failed to convert LFS pointer ${filepath}:`, error.message);
+    return false;
   }
 }
 
@@ -146,10 +211,30 @@ try {
   
   console.log(`Found ${pointerCount} LFS pointer files`);
   
+  // If we found pointer files in Vercel, try to convert them
   if (pointerCount > 0 && isVercel) {
     console.log('WARNING: LFS pointer files found in Vercel environment!');
     console.log('This indicates that LFS files were not properly downloaded.');
+    console.log('Attempting to convert pointer files to actual files...');
+    
+    // Try to convert each pointer file
+    for (const file of pointerFiles) {
+      try {
+        const success = await convertLfsPointer(file);
+        if (success) {
+          console.log(`  Successfully converted ${file}`);
+        } else {
+          console.log(`  Failed to convert ${file}`);
+        }
+      } catch (convertError) {
+        console.log(`  Error converting ${file}:`, convertError.message);
+      }
+    }
+  }
+  
+  if (pointerCount > 0 && isVercel) {
     console.log('Vercel may have limitations with Git LFS.');
+    console.log('Consider moving large files to external storage for production deployments.');
   }
 } catch (error) {
   console.log('Could not verify files');
