@@ -74,28 +74,45 @@ function convertLfsPointer(filepath) {
   }
 }
 
-// Function to force download LFS files
-function forceDownloadLfsFiles() {
+// Function to force download specific LFS files
+function forceDownloadSpecificLfsFiles(lfsFiles) {
   try {
-    console.log('Force downloading LFS files...');
+    console.log('Force downloading specific LFS files...');
     
     // Set environment variables to ensure LFS files are downloaded
     const env = { ...process.env };
     env.GIT_LFS_SKIP_SMUDGE = '0';
     env.GIT_TRACE = '1';
     
-    // Force download all LFS files
-    execSync('git lfs pull --exclude="" --include="*"', {
+    // Create a list of file paths for inclusion
+    const filePaths = lfsFiles.map(file => file.filepath).join(',');
+    
+    // Force download specific LFS files
+    execSync(`git lfs pull --include="${filePaths}"`, {
       env,
       stdio: 'inherit'
     });
     
-    console.log('LFS files force downloaded successfully');
+    console.log('Specific LFS files force downloaded successfully');
     return true;
   } catch (error) {
-    console.log('Failed to force download LFS files:', error.message);
+    console.log('Failed to force download specific LFS files:', error.message);
     return false;
   }
+}
+
+// Function to manually download LFS files if other methods fail
+async function manualLfsDownload(lfsFiles) {
+  console.log('Attempting manual LFS download approach...');
+  
+  // This is a simplified approach - in a real implementation for Vercel,
+  // you would need to use the GitHub LFS API properly
+  console.log('Manual download approach for Vercel not implemented in this script.');
+  console.log('Consider these alternatives:');
+  console.log('1. Optimize files to avoid LFS requirements');
+  console.log('2. Move large files to external storage');
+  
+  return false;
 }
 
 console.log('Checking if Git LFS is installed...');
@@ -132,10 +149,10 @@ if (lfsFiles.length > 0) {
     console.log('  ', file.oid, file.filepath);
   });
   
-  // In Vercel environment, force download LFS files
+  // In Vercel environment, force download specific LFS files
   if (isVercel) {
-    console.log('Forcing LFS file download in Vercel environment...');
-    forceDownloadLfsFiles();
+    console.log('Forcing download of specific LFS files in Vercel environment...');
+    forceDownloadSpecificLfsFiles(lfsFiles);
   }
 }
 
@@ -241,14 +258,21 @@ try {
         console.log('Additional LFS pull failed:', error.message);
       }
     }
+    
+    // Final check - if we still have pointer files, suggest alternatives
+    if (convertedCount < pointerCount) {
+      console.log('FINAL WARNING: Some LFS pointer files remain unconverted.');
+      console.log('This is a known limitation with Vercel and Git LFS.');
+      console.log('RECOMMENDED SOLUTIONS:');
+      console.log('1. Optimize media files to reduce size and avoid LFS requirements');
+      console.log('2. Move large files to external storage (S3, Cloudinary, etc.)');
+      console.log('3. Use Vercel\'s built-in file storage capabilities');
+    }
   }
   
   if (pointerCount > 0 && isVercel) {
-    console.log('Vercel may have limitations with Git LFS.');
-    console.log('If conversion fails, consider these alternatives:');
-    console.log('1. Move large files to external storage (S3, Cloudinary, etc.)');
-    console.log('2. Reduce file sizes to avoid LFS requirements');
-    console.log('3. Use Vercel\'s file upload capabilities for large assets');
+    console.log('Vercel has known limitations with Git LFS.');
+    console.log('The most reliable solution is to avoid LFS by optimizing file sizes.');
   }
 } catch (error) {
   console.log('Could not verify files');
