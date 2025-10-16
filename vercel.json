@@ -5,6 +5,7 @@
   "installCommand": "npm install",
   "framework": null,
   "rewrites": [
+    { "source": "/vamshieee/(.*)", "destination": "/vamshieee/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
