@@ -88,7 +88,7 @@ function generateStaticMedia() {
         year: year,
         caption: caption,
         order_index: index + 1,
-        local_path: `/vamshieee/${file}`,
+        local_path: `./vamshieee/${file}`,
         // Initialize face tags as empty array
         face_tags: []
       };
