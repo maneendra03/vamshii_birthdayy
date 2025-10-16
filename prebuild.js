@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 
 console.log('Starting prebuild script...');
 
@@ -12,6 +13,35 @@ console.log('Environment variables:');
 console.log('  VERCEL:', process.env.VERCEL);
 console.log('  CI:', process.env.CI);
 console.log('  GIT_LFS_SKIP_SMUDGE:', process.env.GIT_LFS_SKIP_SMUDGE);
+
+// Function to check if a file is an LFS pointer
+function isLfsPointer(filePath) {
+  try {
+    const head = execSync(`head -c 50 ${filePath}`, { encoding: 'utf8' });
+    return head.includes('version https://git-lfs.github.com');
+  } catch (error) {
+    return false;
+  }
+}
+
+// Function to get LFS file info
+function getLfsFileInfo() {
+  try {
+    const lsFilesOutput = execSync('git lfs ls-files', { encoding: 'utf8' });
+    const lines = lsFilesOutput.split('\n').filter(line => line.trim());
+    
+    return lines.map(line => {
+      const parts = line.split(' ');
+      const oid = parts[0];
+      const filepath = parts.slice(2).join(' ').replace('public/', '');
+      return { oid, filepath };
+    });
+  } catch (error) {
+    console.log('Could not get LFS file info');
+    console.error(error);
+    return [];
+  }
+}
 
 console.log('Checking if Git LFS is installed...');
 try {
@@ -38,22 +68,19 @@ try {
 }
 
 console.log('Checking LFS files...');
-let lfsFiles = [];
-try {
-  const lsFilesOutput = execSync('git lfs ls-files', { encoding: 'utf8' });
-  lfsFiles = lsFilesOutput.split('\n').filter(line => line.trim());
-  console.log('LFS files count:', lfsFiles.length);
-  
-  // Show first few LFS files for verification
-  const firstFiles = lfsFiles.slice(0, 5);
+const lfsFiles = getLfsFileInfo();
+console.log('LFS files count:', lfsFiles.length);
+
+if (lfsFiles.length > 0) {
   console.log('First few LFS files:');
-  firstFiles.forEach(file => console.log('  ', file));
-} catch (error) {
-  console.log('Could not list LFS files');
-  console.error(error);
+  lfsFiles.slice(0, 3).forEach(file => {
+    console.log('  ', file.oid, file.filepath);
+  });
 }
 
+// Try to pull LFS files normally first
 console.log('Pulling LFS files...');
+let pullSuccess = false;
 try {
   // Set Git LFS environment variables for Vercel
   const env = { ...process.env };
@@ -62,9 +89,6 @@ try {
     console.log('Setting GIT_LFS_SKIP_SMUDGE=0 for Vercel');
   }
   
-  // Also set GIT_TRACE to get more detailed logging
-  env.GIT_TRACE = '1';
-  
   const pullOutput = execSync('git lfs pull', { 
     encoding: 'utf8',
     env,
@@ -72,11 +96,16 @@ try {
   });
   console.log('LFS files pulled successfully');
   console.log('Pull output length:', pullOutput.length);
+  pullSuccess = true;
 } catch (error) {
-  console.log('Could not pull LFS files with git lfs pull, trying alternative approaches...');
+  console.log('Could not pull LFS files with git lfs pull');
   console.error('Error during git lfs pull:', error.message);
+}
+
+// If normal pull failed or we're in Vercel, try alternative approaches
+if (!pullSuccess || isVercel) {
+  console.log('Trying alternative approaches for LFS files...');
   
-  // Try git lfs fetch + git lfs checkout
   try {
     console.log('Trying git lfs fetch...');
     execSync('git lfs fetch', { stdio: 'inherit' });
@@ -88,78 +117,39 @@ try {
   } catch (checkoutError) {
     console.log('Could not fetch/checkout LFS files either');
     console.error('Error during git lfs checkout:', checkoutError.message);
-    
-    // Last resort: try to manually download if we're in Vercel
-    if (isVercel) {
-      console.log('Trying manual download approach for Vercel...');
-      try {
-        // This is a fallback for Vercel environments where LFS might not work properly
-        console.log('WARNING: Manual download approach may not work for all files');
-      } catch (manualError) {
-        console.log('Manual download also failed');
-        console.error(manualError);
-      }
-    }
   }
 }
 
 // Verify that files exist after pulling and check if they are actual files or pointers
 console.log('Verifying file existence and content...');
 let pointerFiles = [];
+
 try {
   const fileCount = execSync('find public/vamshieee -type f | wc -l', { encoding: 'utf8' });
   console.log('Files in public/vamshieee:', fileCount.trim());
   
-  // Check a sample of files to see if they are LFS pointers or actual files
-  const sampleFiles = [
-    'public/vamshieee/IMG20201111132919.jpg',
-    'public/vamshieee/20210810_093418.mp4'
-  ];
+  // Check if files are LFS pointers
+  console.log('Checking for LFS pointer files...');
+  let pointerCount = 0;
   
-  sampleFiles.forEach(file => {
-    try {
-      execSync(`test -f ${file}`);
-      console.log(`File exists: ${file}`);
-      
-      // Check file size
-      const size = execSync(`wc -c < ${file}`, { encoding: 'utf8' });
-      console.log(`  Size: ${size.trim()} bytes`);
-      
-      // Check if it's an LFS pointer or actual file
-      const head = execSync(`head -c 50 ${file}`, { encoding: 'utf8' });
-      if (head.includes('version https://git-lfs.github.com')) {
-        console.log('  WARNING: This is an LFS pointer file, not the actual file!');
-        pointerFiles.push(file);
-      } else {
-        console.log('  This appears to be the actual file');
-      }
-    } catch (err) {
-      console.log(`File does not exist: ${file}`);
+  // Check all files in the vamshieee directory
+  const checkCmd = 'find public/vamshieee -type f';
+  const files = execSync(checkCmd, { encoding: 'utf8' }).split('\n').filter(f => f.trim());
+  
+  files.forEach(file => {
+    if (file && isLfsPointer(file)) {
+      pointerCount++;
+      pointerFiles.push(file);
+      console.log('  LFS pointer found:', file);
     }
   });
   
-  // If we found pointer files, we need to take additional action
-  if (pointerFiles.length > 0 && isVercel) {
-    console.log('Found LFS pointer files in Vercel environment. This indicates LFS files were not properly downloaded.');
-    console.log('Attempting to force download of LFS files...');
-    
-    try {
-      // Force download specific files
-      console.log('Force downloading specific LFS files...');
-      pointerFiles.forEach(file => {
-        const relativePath = file.replace('public/', '');
-        try {
-          execSync(`git lfs pull --include="${relativePath}"`, { stdio: 'inherit' });
-          console.log(`  Successfully pulled ${relativePath}`);
-        } catch (pullError) {
-          console.log(`  Failed to pull ${relativePath}`);
-          console.error(pullError.message);
-        }
-      });
-    } catch (forceError) {
-      console.log('Force download approach also failed');
-      console.error(forceError);
-    }
+  console.log(`Found ${pointerCount} LFS pointer files`);
+  
+  if (pointerCount > 0 && isVercel) {
+    console.log('WARNING: LFS pointer files found in Vercel environment!');
+    console.log('This indicates that LFS files were not properly downloaded.');
+    console.log('Vercel may have limitations with Git LFS.');
   }
 } catch (error) {
   console.log('Could not verify files');
