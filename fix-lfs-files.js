@@ -13,7 +13,9 @@ console.log('Running in Vercel environment:', isVercel);
 // Function to check if a file is an LFS pointer
 function isLfsPointer(filePath) {
   try {
-    const head = execSync(`head -c 50 ${filePath}`, { encoding: 'utf8' });
+    // Properly escape the file path for shell commands
+    const escapedPath = filePath.replace(/(["\s'$`\\])/g, '\\$1');
+    const head = execSync(`head -c 50 ${escapedPath}`, { encoding: 'utf8' });
     return head.includes('version https://git-lfs.github.com');
   } catch (error) {
     return false;

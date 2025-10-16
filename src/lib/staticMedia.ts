@@ -1107,72 +1107,86 @@ export interface StaticQuizQuestion {
 export const staticQuizQuestions: StaticQuizQuestion[] = [
   {
     id: '1',
-    question: "What is Vamshi's most used excuse?",
-    options: ["I forgot", "Trust me bro", "One last time", "Technical issues"],
+    question: "In Which place vamshi is getting bald",
+    options: ["keesargutta", "yadagarigutta", "inti daggar cutting shop", "LuLu mall lo"],
     correct_answer: 1,
     order_index: 1
   },
   {
     id: '2',
-    question: "How many times has he said 'one last game'?",
-    options: ["Never", "Once a week", "Infinite times", "Only on weekends"],
-    correct_answer: 2,
+    question: "Things that make Vamshi angry:",
+    options: ["When people say things that hurt or trigger him", "Being ghosted", "When someone ignores his messages", "When people joke about him"],
+    correct_answer: 0,
     order_index: 2
   },
   {
     id: '3',
-    question: "What is Vamshi's superpower?",
-    options: ["Being on time", "Perfect memory", "Turning 5 minutes into 5 hours", "Cooking skills"],
-    correct_answer: 2,
+    question: "Whats Vamshi favourite topic",
+    options: ["Toilet ", "ussu", "Tatti", "Scat ( doddiki ) ( shit) "],
+    correct_answer: 3,
     order_index: 3
   },
   {
     id: '4',
-    question: "Vamshi's favorite activity?",
-    options: ["Studying", "Going to gym", "Gaming till sunrise", "Morning jogs"],
-    correct_answer: 2,
+    question: "What is vamshi s most used phrase ?",
+    options: ["Ahh bokkale ", "abbha oka 2 mins", "abha please raa", "Exact ga 5 ki podham "],
+    correct_answer: 0,
     order_index: 4
   },
   {
     id: '5',
-    question: "How many times have you both almost got in trouble?",
-    options: ["Never", "Once or twice", "Too many to count", "We always get caught"],
+    question: "What's the vamshis favorite tiffin",
+    options: ["idly", "masala dosa", "panner dosa", "bonda"],
     correct_answer: 2,
     order_index: 5
   },
   {
     id: '6',
-    question: "Vamshi's go-to food order?",
-    options: ["Salad", "Whatever is cheapest", "Always the same thing", "Random experiments"],
-    correct_answer: 2,
+    question: "How vamshi will show love on there loved ones ( even on  family member)",
+    options: ["Overprotective behavior", "Roasting / teasing", "Sarcastic advice", "Scolding"],
+    correct_answer: 3,
     order_index: 6
   },
   {
     id: '7',
-    question: "When does Vamshi reply to messages?",
-    options: ["Immediately", "Within an hour", "3-5 business days", "Only when reminded"],
+    question: "Vamshi's favourite travel destination",
+    options: ["Australia", "paris", "Switzerland ", "us"],
     correct_answer: 2,
     order_index: 7
   },
   {
     id: '8',
-    question: "Vamshi's morning routine?",
-    options: ["5 AM workout", "Snooze alarm 10 times", "Meditation", "Healthy breakfast"],
-    correct_answer: 1,
+    question: "What kind of the person is vamshi",
+    options: ["Friendly", " angry-but-caring", " funny troublemaker", "real one"],
+    correct_answer: 0,
     order_index: 8
   },
   {
     id: '9',
-    question: "Best way to annoy Vamshi?",
-    options: ["Steal his food", "Beat him in games", "Wake him up early", "All of the above"],
+    question: "From where vamshi buy clothes",
+    options: ["From swapnalok", "secunderabad local market", "from erragada chor bazar", "from rakesh anna shop"],
     correct_answer: 3,
     order_index: 9
   },
   {
     id: '10',
-    question: "Your friendship in one word?",
-    options: ["Normal", "Boring", "Legendary Chaos", "Suspicious"],
-    correct_answer: 2,
+    question: "When & why vamshi will go to latrine..?",
+    options: ["when he wakes up in the morning ", "when he eats papu too much", "when he feels tired", "when he is angry"],
+    correct_answer: 1,
     order_index: 10
+  },
+  {
+    id: '11',
+    question: "What is Vamshi's most used phrase on Social media ?",
+    options: ["Therapy","Homie" , "Love" , "Whisper"],
+    correct_answer: 2,
+    order_index: 11
+  },
+  {
+    id: '12',
+    question: "What is Vamshi's most used phrase on Social media ?",
+    options: ["asking if people pooped or not","Judging people’s playlists but still vibing to them." , "Arguing with ChatGPT for fun." , "Correcting people’s grammar in his head during conversations."],
+    correct_answer: 0,
+    order_index: 12
   }
 ];
