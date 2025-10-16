@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Directory containing your media
-const mediaDir = './vamshieee';
+const mediaDir = './public/vamshieee';
 
 // Function to determine if file is photo or video based on extension
 function getMediaType(filename) {
